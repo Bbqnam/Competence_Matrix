@@ -14,7 +14,144 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      competences: {
+        Row: {
+          active: boolean
+          competence_id: string
+          competence_name: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          active?: boolean
+          competence_id: string
+          competence_name: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          active?: boolean
+          competence_id?: string
+          competence_name?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      operator_competences: {
+        Row: {
+          competence_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          operator_id: string
+        }
+        Insert: {
+          competence_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          operator_id: string
+        }
+        Update: {
+          competence_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          operator_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_competences_competence_id_fkey"
+            columns: ["competence_id"]
+            isOneToOne: false
+            referencedRelation: "competences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_competences_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "operators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operators: {
+        Row: {
+          active: boolean
+          area: string | null
+          created_at: string
+          employee_id: string
+          first_name: string
+          id: string
+          last_name: string
+          shift: string | null
+        }
+        Insert: {
+          active?: boolean
+          area?: string | null
+          created_at?: string
+          employee_id: string
+          first_name: string
+          id?: string
+          last_name: string
+          shift?: string | null
+        }
+        Update: {
+          active?: boolean
+          area?: string | null
+          created_at?: string
+          employee_id?: string
+          first_name?: string
+          id?: string
+          last_name?: string
+          shift?: string | null
+        }
+        Relationships: []
+      }
+      training_log: {
+        Row: {
+          action: string
+          changed_by: string | null
+          competence_id: string
+          created_at: string
+          id: string
+          operator_id: string
+        }
+        Insert: {
+          action: string
+          changed_by?: string | null
+          competence_id: string
+          created_at?: string
+          id?: string
+          operator_id: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string | null
+          competence_id?: string
+          created_at?: string
+          id?: string
+          operator_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_log_competence_id_fkey"
+            columns: ["competence_id"]
+            isOneToOne: false
+            referencedRelation: "competences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_log_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "operators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
