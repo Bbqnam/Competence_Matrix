@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { fetchOperators, type Operator } from "@/lib/db";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Pencil, Plus, Power } from "lucide-react";
+import { Pencil, Plus, Power, Download, Upload, Eye } from "lucide-react";
 import { toast } from "sonner";
+import { csvToObjects, downloadCsv, toCsv } from "@/lib/csv";
+import { OperatorDetailsDialog } from "@/components/OperatorDetailsDialog";
 
 export const Route = createFileRoute("/_app/operators")({
   head: () => ({ meta: [{ title: "Operators – KUBAL" }] }),
