@@ -188,6 +188,7 @@ function OperatorsPage() {
                 <Td>{o.area}</Td>
                 <Td>{o.active ? <span className="text-chart-2 text-xs font-medium">Active</span> : <span className="text-muted-foreground text-xs">Inactive</span>}</Td>
                 <Td className="text-right">
+                  <Button size="sm" variant="ghost" onClick={() => setDetailsOpId(o.id)}><Eye className="h-4 w-4" /></Button>
                   <Button size="sm" variant="ghost" onClick={() => openEdit(o)}><Pencil className="h-4 w-4" /></Button>
                   <Button size="sm" variant="ghost" onClick={() => toggleActive(o)}><Power className="h-4 w-4" /></Button>
                 </Td>
