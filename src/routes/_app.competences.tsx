@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { fetchCompetences, type Competence } from "@/lib/db";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Pencil, Plus, Power } from "lucide-react";
+import { Pencil, Plus, Power, Download, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { csvToObjects, downloadCsv, toCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/_app/competences")({
   head: () => ({ meta: [{ title: "Competences – KUBAL" }] }),
