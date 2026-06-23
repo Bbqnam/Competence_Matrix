@@ -44,6 +44,7 @@ function ManagePage() {
   const [opSearch, setOpSearch] = useState("");
   const [compSearch, setCompSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<"added" | "removed" | null>(null);
 
   const matrix = useMemo(() => {
     const s = new Set<string>();
