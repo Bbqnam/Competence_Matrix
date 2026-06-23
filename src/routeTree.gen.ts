@@ -10,32 +10,82 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppOperatorsRouteImport } from './routes/_app.operators'
+import { Route as AppManageRouteImport } from './routes/_app.manage'
+import { Route as AppLogRouteImport } from './routes/_app.log'
+import { Route as AppCompetencesRouteImport } from './routes/_app.competences'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOperatorsRoute = AppOperatorsRouteImport.update({
+  id: '/operators',
+  path: '/operators',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppManageRoute = AppManageRouteImport.update({
+  id: '/manage',
+  path: '/manage',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLogRoute = AppLogRouteImport.update({
+  id: '/log',
+  path: '/log',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCompetencesRoute = AppCompetencesRouteImport.update({
+  id: '/competences',
+  path: '/competences',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AppRoute
+  '/': typeof AppIndexRoute
+  '/competences': typeof AppCompetencesRoute
+  '/log': typeof AppLogRoute
+  '/manage': typeof AppManageRoute
+  '/operators': typeof AppOperatorsRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof AppRoute
+  '/competences': typeof AppCompetencesRoute
+  '/log': typeof AppLogRoute
+  '/manage': typeof AppManageRoute
+  '/operators': typeof AppOperatorsRoute
+  '/': typeof AppIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/_app': typeof AppRoute
+  '/_app': typeof AppRouteWithChildren
+  '/_app/competences': typeof AppCompetencesRoute
+  '/_app/log': typeof AppLogRoute
+  '/_app/manage': typeof AppManageRoute
+  '/_app/operators': typeof AppOperatorsRoute
+  '/_app/': typeof AppIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/competences' | '/log' | '/manage' | '/operators'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/_app'
+  to: '/competences' | '/log' | '/manage' | '/operators' | '/'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/_app/competences'
+    | '/_app/log'
+    | '/_app/manage'
+    | '/_app/operators'
+    | '/_app/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  AppRoute: typeof AppRoute
+  AppRoute: typeof AppRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -47,11 +97,64 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/': {
+      id: '/_app/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/operators': {
+      id: '/_app/operators'
+      path: '/operators'
+      fullPath: '/operators'
+      preLoaderRoute: typeof AppOperatorsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/manage': {
+      id: '/_app/manage'
+      path: '/manage'
+      fullPath: '/manage'
+      preLoaderRoute: typeof AppManageRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/log': {
+      id: '/_app/log'
+      path: '/log'
+      fullPath: '/log'
+      preLoaderRoute: typeof AppLogRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/competences': {
+      id: '/_app/competences'
+      path: '/competences'
+      fullPath: '/competences'
+      preLoaderRoute: typeof AppCompetencesRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppCompetencesRoute: typeof AppCompetencesRoute
+  AppLogRoute: typeof AppLogRoute
+  AppManageRoute: typeof AppManageRoute
+  AppOperatorsRoute: typeof AppOperatorsRoute
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppCompetencesRoute: AppCompetencesRoute,
+  AppLogRoute: AppLogRoute,
+  AppManageRoute: AppManageRoute,
+  AppOperatorsRoute: AppOperatorsRoute,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  AppRoute: AppRoute,
+  AppRoute: AppRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
