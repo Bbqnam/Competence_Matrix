@@ -189,9 +189,13 @@ function Dashboard() {
                 <tr><td colSpan={5 + filteredComps.length} className="text-center text-muted-foreground py-10">No operators match these filters.</td></tr>
               )}
               {filteredOps.map((o, i) => (
-                <tr key={o.id} className={i % 2 ? "bg-muted/30" : ""}>
+                <tr
+                  key={o.id}
+                  onClick={() => setDetailsOpId(o.id)}
+                  className={`${i % 2 ? "bg-muted/30" : ""} cursor-pointer hover:bg-accent/40`}
+                >
                   <td className={`sticky left-0 z-10 ${i % 2 ? "bg-muted/60" : "bg-card"} px-3 py-1.5 border-b border-r border-border font-mono text-xs`}>{o.employee_id}</td>
-                  <td className={`sticky left-[80px] z-10 ${i % 2 ? "bg-muted/60" : "bg-card"} px-3 py-1.5 border-b border-r border-border`}>{o.last_name}</td>
+                  <td className={`sticky left-[80px] z-10 ${i % 2 ? "bg-muted/60" : "bg-card"} px-3 py-1.5 border-b border-r border-border font-medium`}>{o.last_name}</td>
                   <td className={`sticky left-[220px] z-10 ${i % 2 ? "bg-muted/60" : "bg-card"} px-3 py-1.5 border-b border-r border-border`}>{o.first_name}</td>
                   <td className="px-3 py-1.5 border-b border-r border-border text-muted-foreground">{o.shift}</td>
                   <td className="px-3 py-1.5 border-b border-r border-border text-muted-foreground">{o.area}</td>
@@ -200,11 +204,9 @@ function Dashboard() {
                     return (
                       <td key={c.id} className="px-2 py-1.5 border-b border-r border-border text-center">
                         {has ? (
-                          <div className="mx-auto h-5 w-5 rounded-sm bg-chart-2/20 text-chart-2 flex items-center justify-center">
-                            <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                          </div>
+                          <Check className="h-4 w-4 mx-auto text-chart-2" strokeWidth={3} />
                         ) : (
-                          <div className="mx-auto h-5 w-5 rounded-sm border border-dashed border-border" />
+                          <span className="text-muted-foreground/30">·</span>
                         )}
                       </td>
                     );
