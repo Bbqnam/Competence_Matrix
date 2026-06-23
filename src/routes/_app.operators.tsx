@@ -90,6 +90,48 @@ function OperatorsPage() {
     qc.invalidateQueries({ queryKey: ["operators"] });
   }
 
+  function exportCsv() {
+    const csv = toCsv([
+      ["EmployeeID", "LastName", "FirstName", "Shift", "Area", "Status"],
+      ...data.map((o) => [
+        o.employee_id,
+        o.last_name,
+        o.first_name,
+        o.shift ?? "",
+        o.area ?? "",
+        o.active ? "Active" : "Inactive",
+      ]),
+    ]);
+    downloadCsv(`operators_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  }
+
+  async function importCsv(file: File) {
+    try {
+      const text = await file.text();
+      const rows = csvToObjects(text);
+      if (rows.length === 0) return toast.error("CSV is empty");
+      const payload = rows
+        .filter((r) => r.EmployeeID && r.LastName && r.FirstName)
+        .map((r) => ({
+          employee_id: r.EmployeeID,
+          last_name: r.LastName,
+          first_name: r.FirstName,
+          shift: r.Shift || null,
+          area: r.Area || null,
+          active: (r.Status || "Active").toLowerCase() !== "inactive",
+        }));
+      if (payload.length === 0) return toast.error("No valid rows found");
+      const { error } = await supabase
+        .from("operators")
+        .upsert(payload, { onConflict: "employee_id" });
+      if (error) return toast.error(error.message);
+      toast.success(`Imported ${payload.length} operator${payload.length === 1 ? "" : "s"}`);
+      qc.invalidateQueries({ queryKey: ["operators"] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Import failed");
+    }
+  }
+
   const filtered = data.filter((o) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -101,9 +143,30 @@ function OperatorsPage() {
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Operators</h1>
-          <p className="text-sm text-muted-foreground mt-1">Add, edit, or deactivate operators.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {data.length} total · {data.filter((o) => o.active).length} active
+          </p>
         </div>
-        <Button onClick={openNew} className="gap-2"><Plus className="h-4 w-4" /> New operator</Button>
+        <div className="flex gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importCsv(f);
+              e.target.value = "";
+            }}
+          />
+          <Button variant="outline" onClick={() => fileRef.current?.click()} className="gap-2">
+            <Upload className="h-4 w-4" /> Import CSV
+          </Button>
+          <Button variant="outline" onClick={exportCsv} className="gap-2">
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
+          <Button onClick={openNew} className="gap-2"><Plus className="h-4 w-4" /> New operator</Button>
+        </div>
       </div>
 
       <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="max-w-sm" />
