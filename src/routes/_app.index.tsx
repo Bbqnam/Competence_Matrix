@@ -217,6 +217,11 @@ function Dashboard() {
           </table>
         </div>
       </div>
+
+      <OperatorDetailsDialog
+        operatorId={detailsOpId}
+        onOpenChange={(o) => !o && setDetailsOpId(null)}
+      />
     </div>
   );
 }
