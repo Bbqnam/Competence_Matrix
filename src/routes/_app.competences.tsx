@@ -26,6 +26,7 @@ function CompetencesPage() {
   const [editing, setEditing] = useState<Competence | null>(null);
   const [form, setForm] = useState({ ...blank });
   const [search, setSearch] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   function openNew() { setEditing(null); setForm({ ...blank }); setOpen(true); }
   function openEdit(c: Competence) {
