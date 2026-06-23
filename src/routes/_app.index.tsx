@@ -37,6 +37,7 @@ function Dashboard() {
   const [area, setArea] = useState<string>("all");
   const [opSearch, setOpSearch] = useState("");
   const [compSearch, setCompSearch] = useState("");
+  const [detailsOpId, setDetailsOpId] = useState<string | null>(null);
 
   const operators = (operatorsQ.data ?? []).filter((o) => o.active);
   const competences = (competencesQ.data ?? []).filter((c) => c.active);
