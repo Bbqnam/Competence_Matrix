@@ -40,6 +40,8 @@ function OperatorsPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...blank });
   const [search, setSearch] = useState("");
+  const [detailsOpId, setDetailsOpId] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   function openNew() {
     setEditing(null);
