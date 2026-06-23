@@ -219,6 +219,11 @@ function OperatorsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <OperatorDetailsDialog
+        operatorId={detailsOpId}
+        onOpenChange={(o) => !o && setDetailsOpId(null)}
+      />
     </div>
   );
 }
