@@ -55,6 +55,17 @@ function ManagePage() {
   const filteredOps = operators.filter((o) => !opSearch || `${o.first_name} ${o.last_name} ${o.employee_id}`.toLowerCase().includes(opSearch.toLowerCase()));
   const filteredComps = competences.filter((c) => !compSearch || `${c.competence_id} ${c.competence_name}`.toLowerCase().includes(compSearch.toLowerCase()));
 
+  const { pendingAdd, pendingRemove } = useMemo(() => {
+    let add = 0, rem = 0;
+    selectedOps.forEach((o) =>
+      selectedComps.forEach((c) => {
+        if (matrix.has(`${o}::${c}`)) rem++;
+        else add++;
+      }),
+    );
+    return { pendingAdd: add, pendingRemove: rem };
+  }, [selectedOps, selectedComps, matrix]);
+
   function toggle(set: Set<string>, setter: (s: Set<string>) => void, id: string) {
     const n = new Set(set);
     n.has(id) ? n.delete(id) : n.add(id);
