@@ -5,9 +5,8 @@ import {
   fetchOperators,
   fetchCompetences,
   fetchOperatorCompetences,
-  type Operator,
-  type Competence,
 } from "@/lib/db";
+import { OperatorDetailsDialog } from "@/components/OperatorDetailsDialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
