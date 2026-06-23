@@ -7,7 +7,10 @@ import {
   fetchCompetences,
 } from "@/lib/db";
 import { Input } from "@/components/ui/input";
-import { Plus, Minus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Plus, Minus, Download } from "lucide-react";
+import { downloadCsv, toCsv } from "@/lib/csv";
+import { OperatorDetailsDialog } from "@/components/OperatorDetailsDialog";
 
 export const Route = createFileRoute("/_app/log")({
   head: () => ({ meta: [{ title: "Training Log – KUBAL" }] }),
@@ -19,11 +22,16 @@ function LogPage() {
   const ops = useQuery({ queryKey: ["operators"], queryFn: fetchOperators });
   const comps = useQuery({ queryKey: ["competences"], queryFn: fetchCompetences });
   const [search, setSearch] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [detailsOpId, setDetailsOpId] = useState<string | null>(null);
 
   const opMap = useMemo(() => new Map((ops.data ?? []).map((o) => [o.id, o])), [ops.data]);
   const compMap = useMemo(() => new Map((comps.data ?? []).map((c) => [c.id, c])), [comps.data]);
 
   const rows = (log.data ?? []).filter((r) => {
+    if (from && r.created_at < from) return false;
+    if (to && r.created_at > to + "T23:59:59") return false;
     if (!search) return true;
     const q = search.toLowerCase();
     const o = opMap.get(r.operator_id);
@@ -31,13 +39,58 @@ function LogPage() {
     return `${o?.first_name} ${o?.last_name} ${o?.employee_id} ${c?.competence_name} ${r.changed_by}`.toLowerCase().includes(q);
   });
 
+  function exportCsv() {
+    const csv = toCsv([
+      ["Date", "EmployeeID", "Operator", "Competence", "Action", "ChangedBy"],
+      ...rows.map((r) => {
+        const o = opMap.get(r.operator_id);
+        const c = compMap.get(r.competence_id);
+        return [
+          new Date(r.created_at).toISOString(),
+          o?.employee_id ?? "",
+          o ? `${o.last_name}, ${o.first_name}` : "",
+          c ? `${c.competence_id}. ${c.competence_name}` : "",
+          r.action,
+          r.changed_by ?? "",
+        ];
+      }),
+    ]);
+    downloadCsv(`training_log_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  }
+
   return (
     <div className="p-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Training Log</h1>
-        <p className="text-sm text-muted-foreground mt-1">History of every competence change.</p>
+      <div className="flex justify-between items-end">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Training Log</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            History of every competence change · {rows.length} shown
+          </p>
+        </div>
+        <Button variant="outline" onClick={exportCsv} className="gap-2">
+          <Download className="h-4 w-4" /> Export CSV
+        </Button>
       </div>
-      <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by operator, competence, or user…" className="max-w-md" />
+
+      <div className="flex flex-wrap items-end gap-3 bg-card border border-border rounded-lg p-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground">Search</label>
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Operator, competence, user…" className="w-72" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground">From</label>
+          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-44" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground">To</label>
+          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-44" />
+        </div>
+        {(from || to || search) && (
+          <Button variant="ghost" size="sm" onClick={() => { setFrom(""); setTo(""); setSearch(""); }}>
+            Clear
+          </Button>
+        )}
+      </div>
 
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <table className="w-full text-sm">
@@ -53,10 +106,16 @@ function LogPage() {
               const o = opMap.get(r.operator_id);
               const c = compMap.get(r.competence_id);
               return (
-                <tr key={r.id} className="border-t border-border">
+                <tr key={r.id} className="border-t border-border hover:bg-accent/30">
                   <td className="px-4 py-2.5 text-muted-foreground tabular-nums text-xs">{new Date(r.created_at).toLocaleString()}</td>
                   <td className="px-4 py-2.5 font-mono text-xs">{o?.employee_id ?? "—"}</td>
-                  <td className="px-4 py-2.5">{o ? `${o.last_name}, ${o.first_name}` : "—"}</td>
+                  <td className="px-4 py-2.5">
+                    {o ? (
+                      <button onClick={() => setDetailsOpId(o.id)} className="hover:underline text-left">
+                        {o.last_name}, {o.first_name}
+                      </button>
+                    ) : "—"}
+                  </td>
                   <td className="px-4 py-2.5">{c ? `${c.competence_id}. ${c.competence_name}` : "—"}</td>
                   <td className="px-4 py-2.5">
                     {r.action === "added" ? (
@@ -69,10 +128,15 @@ function LogPage() {
                 </tr>
               );
             })}
-            {rows.length === 0 && <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">No log entries yet.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">No log entries match.</td></tr>}
           </tbody>
         </table>
       </div>
+
+      <OperatorDetailsDialog
+        operatorId={detailsOpId}
+        onOpenChange={(o) => !o && setDetailsOpId(null)}
+      />
     </div>
   );
 }

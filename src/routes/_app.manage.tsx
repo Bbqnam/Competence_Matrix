@@ -13,6 +13,16 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Plus, Minus } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_app/manage")({
   head: () => ({ meta: [{ title: "Manage Competences – KUBAL" }] }),
@@ -34,6 +44,7 @@ function ManagePage() {
   const [opSearch, setOpSearch] = useState("");
   const [compSearch, setCompSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<"added" | "removed" | null>(null);
 
   const matrix = useMemo(() => {
     const s = new Set<string>();
@@ -43,6 +54,17 @@ function ManagePage() {
 
   const filteredOps = operators.filter((o) => !opSearch || `${o.first_name} ${o.last_name} ${o.employee_id}`.toLowerCase().includes(opSearch.toLowerCase()));
   const filteredComps = competences.filter((c) => !compSearch || `${c.competence_id} ${c.competence_name}`.toLowerCase().includes(compSearch.toLowerCase()));
+
+  const { pendingAdd, pendingRemove } = useMemo(() => {
+    let add = 0, rem = 0;
+    selectedOps.forEach((o) =>
+      selectedComps.forEach((c) => {
+        if (matrix.has(`${o}::${c}`)) rem++;
+        else add++;
+      }),
+    );
+    return { pendingAdd: add, pendingRemove: rem };
+  }, [selectedOps, selectedComps, matrix]);
 
   function toggle(set: Set<string>, setter: (s: Set<string>) => void, id: string) {
     const n = new Set(set);
@@ -147,16 +169,60 @@ function ManagePage() {
       </div>
 
       <div className="flex items-center justify-end gap-3 bg-card border border-border rounded-lg p-4">
-        <div className="flex-1 text-sm text-muted-foreground">
-          {selectedOps.size} operator{selectedOps.size === 1 ? "" : "s"} × {selectedComps.size} competence{selectedComps.size === 1 ? "" : "s"} = {selectedOps.size * selectedComps.size} pair{selectedOps.size * selectedComps.size === 1 ? "" : "s"}
+        <div className="flex-1 text-sm">
+          <span className="text-foreground font-medium">
+            {selectedOps.size} operator{selectedOps.size === 1 ? "" : "s"} × {selectedComps.size} competence{selectedComps.size === 1 ? "" : "s"}
+          </span>
+          <span className="text-muted-foreground"> = {selectedOps.size * selectedComps.size} assignment{selectedOps.size * selectedComps.size === 1 ? "" : "s"}</span>
+          {(pendingAdd > 0 || pendingRemove > 0) && (
+            <span className="ml-3 text-xs text-muted-foreground">
+              ({pendingAdd} new to add · {pendingRemove} existing to remove)
+            </span>
+          )}
         </div>
-        <Button variant="outline" disabled={busy} onClick={() => applyChange("removed")} className="gap-2">
+        <Button
+          variant="outline"
+          disabled={busy || selectedOps.size === 0 || selectedComps.size === 0}
+          onClick={() => setConfirm("removed")}
+          className="gap-2"
+        >
           <Minus className="h-4 w-4" /> Remove
         </Button>
-        <Button disabled={busy} onClick={() => applyChange("added")} className="gap-2">
+        <Button
+          disabled={busy || selectedOps.size === 0 || selectedComps.size === 0}
+          onClick={() => setConfirm("added")}
+          className="gap-2"
+        >
           <Plus className="h-4 w-4" /> Add
         </Button>
       </div>
+
+      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirm === "added" ? "Add competence assignments?" : "Remove competence assignments?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirm === "added"
+                ? `${pendingAdd} competence assignment${pendingAdd === 1 ? " will be" : "s will be"} created. ${selectedOps.size * selectedComps.size - pendingAdd} already exist and will be skipped.`
+                : `${pendingRemove} competence assignment${pendingRemove === 1 ? " will be" : "s will be"} removed.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const a = confirm!;
+                setConfirm(null);
+                applyChange(a);
+              }}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
