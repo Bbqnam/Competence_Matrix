@@ -176,7 +176,7 @@ function Dashboard() {
                 <th className="text-left font-medium px-3 py-2 border-b border-r border-border min-w-[110px]">Område</th>
                 {filteredComps.map((c) => (
                   <th key={c.id} className="px-2 py-2 border-b border-r border-border align-bottom h-32 min-w-[44px]">
-                    <div className="origin-bottom-left -rotate-60 translate-y-2 whitespace-nowrap text-xs font-medium">
+                    <div className="origin-bottom-left translate-y-2 whitespace-nowrap text-xs font-medium" style={{ transform: "rotate(-55deg) translateY(0.5rem)" }}>
                       <span className="text-muted-foreground mr-1">{c.competence_id}.</span>
                       {c.competence_name}
                     </div>
