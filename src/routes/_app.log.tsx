@@ -1,14 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import {
   fetchTrainingLog,
   fetchOperators,
   fetchCompetences,
 } from "@/lib/db";
+import { subscribe } from "@/lib/mock-store";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus, Minus, Download } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Minus, Download, Lock } from "lucide-react";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { OperatorDetailsDialog } from "@/components/OperatorDetailsDialog";
 
