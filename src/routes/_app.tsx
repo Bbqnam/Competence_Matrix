@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { LayoutGrid, Users, Award, ListChecks, History, Factory } from "lucide-react";
 import { useEffect, useState } from "react";
-import { CHANGED_BY_KEY, getChangedBy } from "@/lib/db";
+import { CHANGED_BY_KEY, DEFAULT_CHANGED_BY, getChangedBy } from "@/lib/db";
 import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/_app")({
