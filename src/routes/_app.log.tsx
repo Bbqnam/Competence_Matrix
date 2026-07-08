@@ -1,11 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import {
-  fetchTrainingLog,
-  fetchOperators,
-  fetchCompetences,
-} from "@/lib/db";
+import { fetchTrainingLog, fetchOperators, fetchCompetences } from "@/lib/db";
 import { subscribe } from "@/lib/mock-store";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,7 +28,7 @@ function LogPage() {
   const ops = useQuery({ queryKey: ["operators"], queryFn: fetchOperators });
   const comps = useQuery({ queryKey: ["competences"], queryFn: fetchCompetences });
   const [search, setSearch] = useState("");
-  const [action, setAction] = useState<"all" | "added" | "removed">("all");
+  const [action, setAction] = useState<string>("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [detailsOpId, setDetailsOpId] = useState<string | null>(null);
@@ -62,7 +58,16 @@ function LogPage() {
 
   function exportCsv() {
     const csv = toCsv([
-      ["Date", "EmployeeID", "Operator", "Competence", "Action", "ChangedBy"],
+      [
+        "Date",
+        "EmployeeID",
+        "Operator",
+        "Competence",
+        "OldLevel",
+        "NewLevel",
+        "Action",
+        "ChangedBy",
+      ],
       ...rows.map((r) => {
         const o = opMap.get(r.operator_id);
         const c = compMap.get(r.competence_id);
@@ -71,6 +76,8 @@ function LogPage() {
           o?.employee_id ?? "",
           o ? `${o.last_name}, ${o.first_name}` : "",
           c ? `${c.competence_id}. ${c.competence_name}` : "",
+          r.old_level ?? "",
+          r.new_level ?? "",
           r.action,
           r.changed_by ?? "",
         ];
@@ -116,14 +123,21 @@ function LogPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All actions</SelectItem>
-              <SelectItem value="added">Added</SelectItem>
-              <SelectItem value="removed">Removed</SelectItem>
+              <SelectItem value="Created">Created</SelectItem>
+              <SelectItem value="Level updated">Level updated</SelectItem>
+              <SelectItem value="Removed">Removed</SelectItem>
+              <SelectItem value="Role requirement changed">Role requirement changed</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted-foreground">From</label>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-44" />
+          <Input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="w-44"
+          />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted-foreground">To</label>
@@ -149,8 +163,22 @@ function LogPage() {
         <table className="w-full text-sm">
           <thead className="bg-secondary">
             <tr className="text-left">
-              {["Date", "Employee ID", "Operator", "Competence", "Action", "Changed by"].map((h) => (
-                <th key={h} className="px-4 py-2.5 font-medium text-xs uppercase tracking-wide text-muted-foreground">{h}</th>
+              {[
+                "Date",
+                "Employee ID",
+                "Operator",
+                "Competence",
+                "Old level",
+                "New level",
+                "Action",
+                "Changed by",
+              ].map((h) => (
+                <th
+                  key={h}
+                  className="px-4 py-2.5 font-medium text-xs uppercase tracking-wide text-muted-foreground"
+                >
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
@@ -160,28 +188,49 @@ function LogPage() {
               const c = compMap.get(r.competence_id);
               return (
                 <tr key={r.id} className="border-t border-border hover:bg-accent/30">
-                  <td className="px-4 py-2.5 text-muted-foreground tabular-nums text-xs">{new Date(r.created_at).toLocaleString()}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground tabular-nums text-xs">
+                    {new Date(r.created_at).toLocaleString()}
+                  </td>
                   <td className="px-4 py-2.5 font-mono text-xs">{o?.employee_id ?? "—"}</td>
                   <td className="px-4 py-2.5">
                     {o ? (
-                      <button onClick={() => setDetailsOpId(o.id)} className="hover:underline text-left">
+                      <button
+                        onClick={() => setDetailsOpId(o.id)}
+                        className="hover:underline text-left"
+                      >
                         {o.last_name}, {o.first_name}
                       </button>
-                    ) : "—"}
-                  </td>
-                  <td className="px-4 py-2.5">{c ? `${c.competence_id}. ${c.competence_name}` : "—"}</td>
-                  <td className="px-4 py-2.5">
-                    {r.action === "added" ? (
-                      <span className="inline-flex items-center gap-1.5 text-chart-2 text-xs font-medium"><Plus className="h-3 w-3" /> Added</span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 text-destructive text-xs font-medium"><Minus className="h-3 w-3" /> Removed</span>
+                      "—"
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {c ? `${c.competence_id}. ${c.competence_name}` : "—"}
+                  </td>
+                  <td className="px-4 py-2.5 text-center tabular-nums">{r.old_level ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-center tabular-nums">{r.new_level ?? "—"}</td>
+                  <td className="px-4 py-2.5">
+                    {r.action === "Created" ? (
+                      <span className="inline-flex items-center gap-1.5 text-chart-2 text-xs font-medium">
+                        <Plus className="h-3 w-3" /> Created
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-destructive text-xs font-medium">
+                        <Minus className="h-3 w-3" /> {r.action}
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-2.5 text-muted-foreground">{r.changed_by}</td>
                 </tr>
               );
             })}
-            {rows.length === 0 && <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">No log entries match.</td></tr>}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={8} className="text-center py-10 text-muted-foreground">
+                  No log entries match.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
