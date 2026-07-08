@@ -27,25 +27,37 @@ export const Route = createFileRoute("/_app/log")({
 });
 
 function LogPage() {
+  const qc = useQueryClient();
   const log = useQuery({ queryKey: ["training_log"], queryFn: fetchTrainingLog });
   const ops = useQuery({ queryKey: ["operators"], queryFn: fetchOperators });
   const comps = useQuery({ queryKey: ["competences"], queryFn: fetchCompetences });
   const [search, setSearch] = useState("");
+  const [action, setAction] = useState<"all" | "added" | "removed">("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [detailsOpId, setDetailsOpId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const u = subscribe(() => qc.invalidateQueries());
+    return () => {
+      u();
+    };
+  }, [qc]);
 
   const opMap = useMemo(() => new Map((ops.data ?? []).map((o) => [o.id, o])), [ops.data]);
   const compMap = useMemo(() => new Map((comps.data ?? []).map((c) => [c.id, c])), [comps.data]);
 
   const rows = (log.data ?? []).filter((r) => {
+    if (action !== "all" && r.action !== action) return false;
     if (from && r.created_at < from) return false;
     if (to && r.created_at > to + "T23:59:59") return false;
     if (!search) return true;
     const q = search.toLowerCase();
     const o = opMap.get(r.operator_id);
     const c = compMap.get(r.competence_id);
-    return `${o?.first_name} ${o?.last_name} ${o?.employee_id} ${c?.competence_name} ${r.changed_by}`.toLowerCase().includes(q);
+    return `${o?.first_name} ${o?.last_name} ${o?.employee_id} ${c?.competence_name} ${r.changed_by}`
+      .toLowerCase()
+      .includes(q);
   });
 
   function exportCsv() {
