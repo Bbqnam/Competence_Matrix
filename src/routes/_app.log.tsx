@@ -83,9 +83,14 @@ function LogPage() {
     <div className="p-8 space-y-6">
       <div className="flex justify-between items-end">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Training Log</h1>
+          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+            Training Log
+            <Badge variant="outline" className="gap-1 font-normal text-[10px]">
+              <Lock className="h-3 w-3" /> Read-only audit
+            </Badge>
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            History of every competence change · {rows.length} shown
+            Immutable history of every competence change · {rows.length} shown
           </p>
         </div>
         <Button variant="outline" onClick={exportCsv} className="gap-2">
@@ -96,7 +101,25 @@ function LogPage() {
       <div className="flex flex-wrap items-end gap-3 bg-card border border-border rounded-lg p-4">
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted-foreground">Search</label>
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Operator, competence, user…" className="w-72" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Operator, competence, user…"
+            className="w-72"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground">Action</label>
+          <Select value={action} onValueChange={(v) => setAction(v as any)}>
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All actions</SelectItem>
+              <SelectItem value="added">Added</SelectItem>
+              <SelectItem value="removed">Removed</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted-foreground">From</label>
@@ -106,8 +129,17 @@ function LogPage() {
           <label className="text-xs text-muted-foreground">To</label>
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-44" />
         </div>
-        {(from || to || search) && (
-          <Button variant="ghost" size="sm" onClick={() => { setFrom(""); setTo(""); setSearch(""); }}>
+        {(from || to || search || action !== "all") && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setFrom("");
+              setTo("");
+              setSearch("");
+              setAction("all");
+            }}
+          >
             Clear
           </Button>
         )}
