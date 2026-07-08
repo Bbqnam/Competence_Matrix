@@ -1,4 +1,3 @@
-import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -8,15 +7,12 @@ export default defineConfig({
   plugins: [
     tsConfigPaths(),
     tailwindcss(),
-    tanstackStart({
-      server: { entry: "server" },
-    }),
     react(),
   ],
   resolve: {
     alias: {
       "@": "/src",
     },
-    dedupe: ["react", "react-dom", "@tanstack/react-start", "@tanstack/react-router"],
+    dedupe: ["react", "react-dom", "@tanstack/react-router"],
   },
 });
