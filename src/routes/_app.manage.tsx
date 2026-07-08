@@ -7,10 +7,17 @@ import {
   fetchOperatorCompetences,
   getChangedBy,
 } from "@/lib/db";
-import { supabase } from "@/integrations/supabase/client";
+import { m_bulkAssign, m_bulkUnassign, subscribe } from "@/lib/mock-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { Plus, Minus } from "lucide-react";
 import {
@@ -23,6 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useEffect } from "react";
 
 export const Route = createFileRoute("/_app/manage")({
   head: () => ({ meta: [{ title: "Manage Competences – KUBAL" }] }),
@@ -35,6 +43,8 @@ function ManagePage() {
   const competencesQ = useQuery({ queryKey: ["competences"], queryFn: fetchCompetences });
   const ocQ = useQuery({ queryKey: ["operator_competences"], queryFn: fetchOperatorCompetences });
 
+  useEffect(() => subscribe(() => qc.invalidateQueries()), [qc]);
+
   const operators = (operatorsQ.data ?? []).filter((o) => o.active);
   const competences = (competencesQ.data ?? []).filter((c) => c.active);
   const oc = ocQ.data ?? [];
@@ -43,8 +53,13 @@ function ManagePage() {
   const [selectedComps, setSelectedComps] = useState<Set<string>>(new Set());
   const [opSearch, setOpSearch] = useState("");
   const [compSearch, setCompSearch] = useState("");
+  const [shiftFilter, setShiftFilter] = useState("all");
+  const [areaFilter, setAreaFilter] = useState("all");
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<"added" | "removed" | null>(null);
+
+  const shifts = Array.from(new Set(operators.map((o) => o.shift).filter(Boolean))) as string[];
+  const areas = Array.from(new Set(operators.map((o) => o.area).filter(Boolean))) as string[];
 
   const matrix = useMemo(() => {
     const s = new Set<string>();
@@ -52,11 +67,23 @@ function ManagePage() {
     return s;
   }, [oc]);
 
-  const filteredOps = operators.filter((o) => !opSearch || `${o.first_name} ${o.last_name} ${o.employee_id}`.toLowerCase().includes(opSearch.toLowerCase()));
-  const filteredComps = competences.filter((c) => !compSearch || `${c.competence_id} ${c.competence_name}`.toLowerCase().includes(compSearch.toLowerCase()));
+  const filteredOps = operators.filter((o) => {
+    if (shiftFilter !== "all" && o.shift !== shiftFilter) return false;
+    if (areaFilter !== "all" && o.area !== areaFilter) return false;
+    if (!opSearch) return true;
+    return `${o.first_name} ${o.last_name} ${o.employee_id}`
+      .toLowerCase()
+      .includes(opSearch.toLowerCase());
+  });
+  const filteredComps = competences.filter(
+    (c) =>
+      !compSearch ||
+      `${c.competence_id} ${c.competence_name}`.toLowerCase().includes(compSearch.toLowerCase()),
+  );
 
   const { pendingAdd, pendingRemove } = useMemo(() => {
-    let add = 0, rem = 0;
+    let add = 0,
+      rem = 0;
     selectedOps.forEach((o) =>
       selectedComps.forEach((c) => {
         if (matrix.has(`${o}::${c}`)) rem++;
@@ -84,44 +111,24 @@ function ManagePage() {
     const changedBy = getChangedBy();
     const opIds = [...selectedOps];
     const compIds = [...selectedComps];
-
-    const logRows: any[] = [];
-    if (action === "added") {
-      const toInsert: any[] = [];
-      for (const o of opIds) for (const c of compIds) {
-        if (!matrix.has(`${o}::${c}`)) {
-          toInsert.push({ operator_id: o, competence_id: c, created_by: changedBy });
-          logRows.push({ operator_id: o, competence_id: c, action: "added", changed_by: changedBy });
-        }
+    try {
+      if (action === "added") {
+        const res = await m_bulkAssign(opIds, compIds, changedBy);
+        if (res.added === 0) toast.info(`Nothing to add · ${res.skipped} already assigned`);
+        else
+          toast.success(
+            `Added ${res.added} competence${res.added === 1 ? "" : "s"}` +
+              (res.skipped ? ` · ${res.skipped} skipped (duplicate)` : ""),
+          );
+      } else {
+        const res = await m_bulkUnassign(opIds, compIds, changedBy);
+        if (res.removed === 0) toast.info("None of the selected competences were assigned");
+        else toast.success(`Removed ${res.removed} competence${res.removed === 1 ? "" : "s"}`);
       }
-      if (toInsert.length === 0) {
-        toast.info("All selected competences are already assigned");
-        setBusy(false); return;
-      }
-      const { error } = await supabase.from("operator_competences").insert(toInsert);
-      if (error) { toast.error(error.message); setBusy(false); return; }
-    } else {
-      const pairsToRemove: { o: string; c: string }[] = [];
-      for (const o of opIds) for (const c of compIds) {
-        if (matrix.has(`${o}::${c}`)) {
-          pairsToRemove.push({ o, c });
-          logRows.push({ operator_id: o, competence_id: c, action: "removed", changed_by: changedBy });
-        }
-      }
-      if (pairsToRemove.length === 0) {
-        toast.info("None of the selected competences were assigned");
-        setBusy(false); return;
-      }
-      for (const p of pairsToRemove) {
-        await supabase.from("operator_competences").delete().match({ operator_id: p.o, competence_id: p.c });
-      }
+      qc.invalidateQueries();
+    } finally {
+      setBusy(false);
     }
-    if (logRows.length) await supabase.from("training_log").insert(logRows);
-
-    toast.success(`${logRows.length} change${logRows.length === 1 ? "" : "s"} ${action}`);
-    qc.invalidateQueries({ queryKey: ["operator_competences"] });
-    qc.invalidateQueries({ queryKey: ["training_log"] });
-    setBusy(false);
   }
 
   return (
@@ -141,12 +148,52 @@ function ManagePage() {
           onSearch={setOpSearch}
           onSelectAll={() => selectAll(filteredOps, setSelectedOps)}
           onClear={() => setSelectedOps(new Set())}
+          extraFilters={
+            <>
+              <Select value={shiftFilter} onValueChange={setShiftFilter}>
+                <SelectTrigger className="h-8 w-32 text-xs">
+                  <SelectValue placeholder="Shift" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All shifts</SelectItem>
+                  {shifts.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={areaFilter} onValueChange={setAreaFilter}>
+                <SelectTrigger className="h-8 w-40 text-xs">
+                  <SelectValue placeholder="Area" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All areas</SelectItem>
+                  {areas.map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {a}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          }
         >
           {filteredOps.map((o) => (
-            <Row key={o.id} checked={selectedOps.has(o.id)} onToggle={() => toggle(selectedOps, setSelectedOps, o.id)}>
-              <span className="font-mono text-xs text-muted-foreground w-12 shrink-0">{o.employee_id}</span>
-              <span className="flex-1">{o.last_name}, {o.first_name}</span>
-              <span className="text-xs text-muted-foreground">{o.shift} · {o.area}</span>
+            <Row
+              key={o.id}
+              checked={selectedOps.has(o.id)}
+              onToggle={() => toggle(selectedOps, setSelectedOps, o.id)}
+            >
+              <span className="font-mono text-xs text-muted-foreground w-12 shrink-0">
+                {o.employee_id}
+              </span>
+              <span className="flex-1">
+                {o.last_name}, {o.first_name}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {o.shift} · {o.area}
+              </span>
             </Row>
           ))}
         </Panel>
@@ -160,8 +207,14 @@ function ManagePage() {
           onClear={() => setSelectedComps(new Set())}
         >
           {filteredComps.map((c) => (
-            <Row key={c.id} checked={selectedComps.has(c.id)} onToggle={() => toggle(selectedComps, setSelectedComps, c.id)}>
-              <span className="font-mono text-xs text-muted-foreground w-10 shrink-0">{c.competence_id}</span>
+            <Row
+              key={c.id}
+              checked={selectedComps.has(c.id)}
+              onToggle={() => toggle(selectedComps, setSelectedComps, c.id)}
+            >
+              <span className="font-mono text-xs text-muted-foreground w-10 shrink-0">
+                {c.competence_id}
+              </span>
               <span className="flex-1">{c.competence_name}</span>
             </Row>
           ))}
@@ -171,9 +224,14 @@ function ManagePage() {
       <div className="flex items-center justify-end gap-3 bg-card border border-border rounded-lg p-4">
         <div className="flex-1 text-sm">
           <span className="text-foreground font-medium">
-            {selectedOps.size} operator{selectedOps.size === 1 ? "" : "s"} × {selectedComps.size} competence{selectedComps.size === 1 ? "" : "s"}
+            {selectedOps.size} operator{selectedOps.size === 1 ? "" : "s"} × {selectedComps.size}{" "}
+            competence{selectedComps.size === 1 ? "" : "s"}
           </span>
-          <span className="text-muted-foreground"> = {selectedOps.size * selectedComps.size} assignment{selectedOps.size * selectedComps.size === 1 ? "" : "s"}</span>
+          <span className="text-muted-foreground">
+            {" "}
+            = {selectedOps.size * selectedComps.size} assignment
+            {selectedOps.size * selectedComps.size === 1 ? "" : "s"}
+          </span>
           {(pendingAdd > 0 || pendingRemove > 0) && (
             <span className="ml-3 text-xs text-muted-foreground">
               ({pendingAdd} new to add · {pendingRemove} existing to remove)
@@ -201,11 +259,15 @@ function ManagePage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirm === "added" ? "Add competence assignments?" : "Remove competence assignments?"}
+              {confirm === "added"
+                ? "Add competence assignments?"
+                : "Remove competence assignments?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirm === "added"
-                ? `${pendingAdd} competence assignment${pendingAdd === 1 ? " will be" : "s will be"} created. ${selectedOps.size * selectedComps.size - pendingAdd} already exist and will be skipped.`
+                ? `${pendingAdd} competence assignment${pendingAdd === 1 ? " will be" : "s will be"} created. ${
+                    selectedOps.size * selectedComps.size - pendingAdd
+                  } already exist and will be skipped.`
                 : `${pendingRemove} competence assignment${pendingRemove === 1 ? " will be" : "s will be"} removed.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -228,7 +290,14 @@ function ManagePage() {
 }
 
 function Panel({
-  title, count, search, onSearch, onSelectAll, onClear, children,
+  title,
+  count,
+  search,
+  onSearch,
+  onSelectAll,
+  onClear,
+  extraFilters,
+  children,
 }: any) {
   return (
     <div className="bg-card border border-border rounded-lg flex flex-col min-h-0">
@@ -237,10 +306,20 @@ function Panel({
           <h2 className="font-semibold">{title}</h2>
           <span className="text-xs text-muted-foreground">{count}</span>
         </div>
-        <Input value={search} onChange={(e) => onSearch(e.target.value)} placeholder="Search…" className="h-8 text-sm" />
+        <Input
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+          placeholder="Search…"
+          className="h-8 text-sm"
+        />
+        {extraFilters && <div className="flex gap-2">{extraFilters}</div>}
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={onSelectAll} className="h-7 text-xs">Select all visible</Button>
-          <Button size="sm" variant="ghost" onClick={onClear} className="h-7 text-xs">Clear</Button>
+          <Button size="sm" variant="outline" onClick={onSelectAll} className="h-7 text-xs">
+            Select all visible
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onClear} className="h-7 text-xs">
+            Clear
+          </Button>
         </div>
       </div>
       <div className="overflow-auto flex-1">{children}</div>
