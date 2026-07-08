@@ -1,5 +1,13 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { LayoutGrid, Users, Award, ListChecks, History, Factory } from "lucide-react";
+import {
+  LayoutGrid,
+  Users,
+  Award,
+  ListChecks,
+  History,
+  Factory,
+  ClipboardCheck,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { CHANGED_BY_KEY, DEFAULT_CHANGED_BY, getChangedBy } from "@/lib/db";
 import { Input } from "@/components/ui/input";
@@ -13,6 +21,7 @@ const nav = [
   { to: "/manage", label: "Manage Competences", icon: ListChecks },
   { to: "/operators", label: "Operators", icon: Users },
   { to: "/competences", label: "Competences", icon: Award },
+  { to: "/role-requirements", label: "Role Requirements", icon: ClipboardCheck },
   { to: "/log", label: "Training Log", icon: History },
 ];
 
