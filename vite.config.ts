@@ -4,11 +4,15 @@ import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
-  plugins: [
-    tsConfigPaths(),
-    tailwindcss(),
-    react(),
-  ],
+  plugins: [tsConfigPaths(), tailwindcss(), react()],
+  build: {
+    outDir: "dist",
+    emptyOutDir: true,
+  },
+  server: {
+    host: "0.0.0.0",
+    port: 8080,
+  },
   resolve: {
     alias: {
       "@": "/src",
