@@ -43,7 +43,12 @@ function ManagePage() {
   const competencesQ = useQuery({ queryKey: ["competences"], queryFn: fetchCompetences });
   const ocQ = useQuery({ queryKey: ["operator_competences"], queryFn: fetchOperatorCompetences });
 
-  useEffect(() => subscribe(() => qc.invalidateQueries()), [qc]);
+  useEffect(() => {
+    const unsub = subscribe(() => qc.invalidateQueries());
+    return () => {
+      unsub();
+    };
+  }, [qc]);
 
   const operators = (operatorsQ.data ?? []).filter((o) => o.active);
   const competences = (competencesQ.data ?? []).filter((c) => c.active);
