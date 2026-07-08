@@ -6,17 +6,7 @@ import type {
   RoleRequirement,
   Level,
 } from "./db";
-
-const MOCK_ROLES = [
-  "Charger",
-  "Shift Leader",
-  "Ugnsman",
-  "Hertwich Operator",
-  "Casting Operator",
-  "Laboratory Technician",
-  "Maintenance Technician",
-  "Logistics Operator",
-] as const;
+import { ROLES } from "./db";
 
 const STORAGE_KEY = "kubal_mock_store_v4_levels_roles";
 const AREAS = ["Electrolysis", "Casthouse", "Maintenance", "Laboratory", "Logistics"] as const;
@@ -117,9 +107,9 @@ function seed(): Store {
     "Logistics Operator": "Logistics",
   };
   const roleCycle = [
-    ...MOCK_ROLES,
-    ...MOCK_ROLES,
-    ...MOCK_ROLES,
+    ...ROLES,
+    ...ROLES,
+    ...ROLES,
     "Charger",
     "Shift Leader",
     "Casting Operator",
