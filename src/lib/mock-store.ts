@@ -301,7 +301,6 @@ function saveSeededStore(storeToSave: Store) {
     console.warn("Unable to persist demo store", error);
   }
 }
-
 function load(): Store {
   if (typeof window === "undefined") return seed();
   try {
