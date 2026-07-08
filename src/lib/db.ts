@@ -1,4 +1,13 @@
-import { supabase } from "@/integrations/supabase/client";
+// Data access layer. For the demo build, all reads/writes go through a
+// local persistent mock store (src/lib/mock-store.ts) so the app is stable
+// even without a backend connection.
+
+import {
+  m_fetchOperators,
+  m_fetchCompetences,
+  m_fetchOperatorCompetences,
+  m_fetchTrainingLog,
+} from "./mock-store";
 
 export type Operator = {
   id: string;
@@ -37,42 +46,14 @@ export type TrainingLogRow = {
 };
 
 export const CHANGED_BY_KEY = "kubal_changed_by";
+export const DEFAULT_CHANGED_BY = "Nam Nguyen";
 
 export function getChangedBy(): string {
-  if (typeof window === "undefined") return "system";
-  return localStorage.getItem(CHANGED_BY_KEY) || "shiftleader";
+  if (typeof window === "undefined") return DEFAULT_CHANGED_BY;
+  return localStorage.getItem(CHANGED_BY_KEY) || DEFAULT_CHANGED_BY;
 }
 
-export async function fetchOperators() {
-  const { data, error } = await supabase
-    .from("operators")
-    .select("*")
-    .order("last_name", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as Operator[];
-}
-
-export async function fetchCompetences() {
-  const { data, error } = await supabase
-    .from("competences")
-    .select("*")
-    .order("competence_id", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as Competence[];
-}
-
-export async function fetchOperatorCompetences() {
-  const { data, error } = await supabase.from("operator_competences").select("*");
-  if (error) throw error;
-  return (data ?? []) as OperatorCompetence[];
-}
-
-export async function fetchTrainingLog() {
-  const { data, error } = await supabase
-    .from("training_log")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(500);
-  if (error) throw error;
-  return (data ?? []) as TrainingLogRow[];
-}
+export const fetchOperators = m_fetchOperators;
+export const fetchCompetences = m_fetchCompetences;
+export const fetchOperatorCompetences = m_fetchOperatorCompetences;
+export const fetchTrainingLog = m_fetchTrainingLog;
