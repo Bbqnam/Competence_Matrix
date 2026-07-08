@@ -1,7 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { fetchCompetences, type Competence } from "@/lib/db";
+import {
+  fetchCompetences,
+  fetchOperators,
+  fetchOperatorCompetences,
+  fetchRoleRequirements,
+  type Competence,
+} from "@/lib/db";
 import {
   m_upsertCompetence,
   m_setCompetenceActive,
@@ -20,7 +26,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Pencil, Plus, Power, Download, Upload } from "lucide-react";
+import { Pencil, Plus, Power, Download, Upload, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { csvToObjects, downloadCsv, toCsv } from "@/lib/csv";
 
@@ -34,10 +40,14 @@ const blank = { competence_id: "", competence_name: "", active: true };
 function CompetencesPage() {
   const qc = useQueryClient();
   const { data = [] } = useQuery({ queryKey: ["competences"], queryFn: fetchCompetences });
+  const ops = useQuery({ queryKey: ["operators"], queryFn: fetchOperators });
+  const oc = useQuery({ queryKey: ["operator_competences"], queryFn: fetchOperatorCompetences });
+  const reqs = useQuery({ queryKey: ["role_requirements"], queryFn: fetchRoleRequirements });
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Competence | null>(null);
   const [form, setForm] = useState({ ...blank });
   const [search, setSearch] = useState("");
+  const [details, setDetails] = useState<Competence | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -185,6 +195,9 @@ function CompetencesPage() {
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-right">
+                  <Button size="sm" variant="ghost" onClick={() => setDetails(c)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -243,6 +256,100 @@ function CompetencesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={!!details} onOpenChange={(o) => !o && setDetails(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Competence detail</DialogTitle>
+          </DialogHeader>
+          {details && (
+            <CompetenceDetail
+              c={details}
+              operators={ops.data ?? []}
+              oc={oc.data ?? []}
+              reqs={reqs.data ?? []}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function CompetenceDetail({ c, operators, oc, reqs }: any) {
+  const active = operators.filter((o: any) => o.active);
+  const assigned = oc.filter((r: any) => r.competence_id === c.id);
+  const haveIds = new Set(assigned.map((r: any) => r.operator_id));
+  const mandatoryRoles = [
+    ...new Set(
+      reqs.filter((r: any) => r.competence_id === c.id && r.mandatory).map((r: any) => r.role),
+    ),
+  ];
+  const pct = active.length
+    ? Math.round(
+        (assigned.filter((r: any) => active.some((o: any) => o.id === r.operator_id)).length /
+          active.length) *
+          100,
+      )
+    : 0;
+  const group = (key: string) =>
+    [...new Set(active.map((o: any) => o[key] ?? "—"))]
+      .map((g: any) => {
+        const ops = active.filter((o: any) => (o[key] ?? "—") === g);
+        const n = ops.filter((o: any) => haveIds.has(o.id)).length;
+        return `${g}: ${ops.length ? Math.round((n / ops.length) * 100) : 0}%`;
+      })
+      .join(" · ");
+  return (
+    <div className="space-y-4 text-sm">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <b>Code</b>
+          <br />
+          <span className="font-mono">{c.competence_id}</span>
+        </div>
+        <div>
+          <b>Name</b>
+          <br />
+          {c.competence_name}
+        </div>
+        <div>
+          <b>Operators with competence</b>
+          <br />
+          {assigned.length}
+        </div>
+        <div>
+          <b>Overall coverage</b>
+          <br />
+          {pct}%
+        </div>
+        <div className="col-span-2">
+          <b>Mandatory for roles</b>
+          <br />
+          {mandatoryRoles.join(", ") || "None"}
+        </div>
+        <div className="col-span-2">
+          <b>Coverage by area</b>
+          <br />
+          {group("area")}
+        </div>
+        <div className="col-span-2">
+          <b>Coverage by shift</b>
+          <br />
+          {group("shift")}
+        </div>
+      </div>
+      <div>
+        <b>Operators missing this competence</b>
+        <div className="border rounded mt-2 max-h-40 overflow-auto divide-y">
+          {active
+            .filter((o: any) => !haveIds.has(o.id))
+            .map((o: any) => (
+              <div key={o.id} className="p-2">
+                {o.last_name}, {o.first_name} · {o.role}
+              </div>
+            ))}
+        </div>
+      </div>
     </div>
   );
 }

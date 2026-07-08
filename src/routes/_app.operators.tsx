@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { fetchOperators, type Operator } from "@/lib/db";
+import { fetchOperators, type Operator, ROLES } from "@/lib/db";
 import {
   m_upsertOperator,
   m_setOperatorActive,
@@ -46,6 +46,7 @@ const blank = {
   first_name: "",
   shift: "",
   area: "",
+  role: "Charger",
   active: true,
 };
 
@@ -58,6 +59,7 @@ function OperatorsPage() {
   const [search, setSearch] = useState("");
   const [shiftFilter, setShiftFilter] = useState("all");
   const [areaFilter, setAreaFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
   const [detailsOpId, setDetailsOpId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -81,6 +83,7 @@ function OperatorsPage() {
       first_name: o.first_name,
       shift: o.shift ?? "",
       area: o.area ?? "",
+      role: o.role ?? "Charger",
       active: o.active,
     });
     setOpen(true);
@@ -97,6 +100,7 @@ function OperatorsPage() {
         first_name: form.first_name,
         shift: form.shift || null,
         area: form.area || null,
+        role: form.role,
         active: form.active,
       },
       editing?.id,
@@ -112,13 +116,14 @@ function OperatorsPage() {
 
   function exportCsv() {
     const csv = toCsv([
-      ["EmployeeID", "LastName", "FirstName", "Shift", "Area", "Status"],
+      ["EmployeeID", "LastName", "FirstName", "Shift", "Area", "Role", "Status"],
       ...data.map((o) => [
         o.employee_id,
         o.last_name,
         o.first_name,
         o.shift ?? "",
         o.area ?? "",
+        o.role ?? "",
         o.active ? "Active" : "Inactive",
       ]),
     ]);
@@ -161,6 +166,7 @@ function OperatorsPage() {
   const filtered = data.filter((o) => {
     if (shiftFilter !== "all" && o.shift !== shiftFilter) return false;
     if (areaFilter !== "all" && o.area !== areaFilter) return false;
+    if (roleFilter !== "all" && o.role !== roleFilter) return false;
     if (!search) return true;
     return `${o.first_name} ${o.last_name} ${o.employee_id}`
       .toLowerCase()
@@ -242,6 +248,22 @@ function OperatorsPage() {
             </SelectContent>
           </Select>
         </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground">Role</label>
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All roles</SelectItem>
+              {ROLES.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="bg-card border border-border rounded-lg overflow-hidden">
@@ -253,6 +275,7 @@ function OperatorsPage() {
               <Th>First name</Th>
               <Th>Shift</Th>
               <Th>Area</Th>
+              <Th>Role</Th>
               <Th>Status</Th>
               <Th className="text-right">Actions</Th>
             </tr>
@@ -265,6 +288,9 @@ function OperatorsPage() {
                 <Td>{o.first_name}</Td>
                 <Td className="text-muted-foreground">{o.shift}</Td>
                 <Td className="text-muted-foreground">{o.area}</Td>
+                <Td>
+                  <Badge variant="outline">{o.role}</Badge>
+                </Td>
                 <Td>
                   {o.active ? (
                     <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-emerald-200">
@@ -291,7 +317,7 @@ function OperatorsPage() {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-10 text-muted-foreground">
+                <td colSpan={8} className="text-center py-10 text-muted-foreground">
                   No operators match.
                 </td>
               </tr>
@@ -313,10 +339,7 @@ function OperatorsPage() {
               />
             </Field>
             <Field label="Shift">
-              <Select
-                value={form.shift}
-                onValueChange={(v) => setForm({ ...form, shift: v })}
-              >
+              <Select value={form.shift} onValueChange={(v) => setForm({ ...form, shift: v })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select shift" />
                 </SelectTrigger>
@@ -340,6 +363,20 @@ function OperatorsPage() {
                 value={form.first_name}
                 onChange={(e) => setForm({ ...form, first_name: e.target.value })}
               />
+            </Field>
+            <Field label="Role">
+              <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLES.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Area">
               <Select value={form.area} onValueChange={(v) => setForm({ ...form, area: v })}>

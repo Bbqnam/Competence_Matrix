@@ -1,13 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   fetchOperators,
   fetchCompetences,
   fetchOperatorCompetences,
+  fetchRoleRequirements,
   getChangedBy,
+  ROLES,
+  type Level,
 } from "@/lib/db";
-import { m_bulkAssign, m_bulkUnassign, subscribe } from "@/lib/mock-store";
+import { m_bulkSetLevel, m_bulkUnassign, subscribe } from "@/lib/mock-store";
+import { LEVELS } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,146 +22,133 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Minus } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useEffect } from "react";
-
+import { Minus, Save } from "lucide-react";
 export const Route = createFileRoute("/_app/manage")({
   head: () => ({ meta: [{ title: "Manage Competences – KUBAL" }] }),
   component: ManagePage,
 });
-
 function ManagePage() {
   const qc = useQueryClient();
-  const operatorsQ = useQuery({ queryKey: ["operators"], queryFn: fetchOperators });
-  const competencesQ = useQuery({ queryKey: ["competences"], queryFn: fetchCompetences });
+  const opsQ = useQuery({ queryKey: ["operators"], queryFn: fetchOperators });
+  const compsQ = useQuery({ queryKey: ["competences"], queryFn: fetchCompetences });
   const ocQ = useQuery({ queryKey: ["operator_competences"], queryFn: fetchOperatorCompetences });
-
-  useEffect(() => {
-    const unsub = subscribe(() => qc.invalidateQueries());
-    return () => {
-      unsub();
-    };
-  }, [qc]);
-
-  const operators = (operatorsQ.data ?? []).filter((o) => o.active);
-  const competences = (competencesQ.data ?? []).filter((c) => c.active);
-  const oc = ocQ.data ?? [];
-
-  const [selectedOps, setSelectedOps] = useState<Set<string>>(new Set());
-  const [selectedComps, setSelectedComps] = useState<Set<string>>(new Set());
-  const [opSearch, setOpSearch] = useState("");
-  const [compSearch, setCompSearch] = useState("");
-  const [shiftFilter, setShiftFilter] = useState("all");
-  const [areaFilter, setAreaFilter] = useState("all");
-  const [busy, setBusy] = useState(false);
-  const [confirm, setConfirm] = useState<"added" | "removed" | null>(null);
-
-  const shifts = Array.from(new Set(operators.map((o) => o.shift).filter(Boolean))) as string[];
-  const areas = Array.from(new Set(operators.map((o) => o.area).filter(Boolean))) as string[];
-
-  const matrix = useMemo(() => {
-    const s = new Set<string>();
-    oc.forEach((r) => s.add(`${r.operator_id}::${r.competence_id}`));
-    return s;
-  }, [oc]);
-
-  const filteredOps = operators.filter((o) => {
-    if (shiftFilter !== "all" && o.shift !== shiftFilter) return false;
-    if (areaFilter !== "all" && o.area !== areaFilter) return false;
-    if (!opSearch) return true;
-    return `${o.first_name} ${o.last_name} ${o.employee_id}`
-      .toLowerCase()
-      .includes(opSearch.toLowerCase());
-  });
-  const filteredComps = competences.filter(
-    (c) =>
-      !compSearch ||
-      `${c.competence_id} ${c.competence_name}`.toLowerCase().includes(compSearch.toLowerCase()),
+  const reqQ = useQuery({ queryKey: ["role_requirements"], queryFn: fetchRoleRequirements });
+  useEffect(() => subscribe(() => qc.invalidateQueries()), [qc]);
+  const operators = (opsQ.data ?? []).filter((o) => o.active),
+    comps = (compsQ.data ?? []).filter((c) => c.active),
+    oc = ocQ.data ?? [],
+    reqs = reqQ.data ?? [];
+  const [selectedOps, setSelectedOps] = useState<Set<string>>(new Set()),
+    [selectedComps, setSelectedComps] = useState<Set<string>>(new Set()),
+    [level, setLevel] = useState<Level>(3),
+    [opSearch, setOpSearch] = useState(""),
+    [compSearch, setCompSearch] = useState(""),
+    [shift, setShift] = useState("all"),
+    [area, setArea] = useState("all"),
+    [role, setRole] = useState("all"),
+    [mandatory, setMandatory] = useState(false),
+    [busy, setBusy] = useState(false);
+  const shifts = [...new Set(operators.map((o) => o.shift).filter(Boolean))] as string[];
+  const areas = [...new Set(operators.map((o) => o.area).filter(Boolean))] as string[];
+  const selectedRoles = [
+    ...new Set(
+      operators
+        .filter((o) => selectedOps.has(o.id))
+        .map((o) => o.role)
+        .filter(Boolean),
+    ),
+  ] as string[];
+  const matrix = new Map(oc.map((r) => [`${r.operator_id}::${r.competence_id}`, r]));
+  const filteredOps = operators.filter(
+    (o) =>
+      (shift === "all" || o.shift === shift) &&
+      (area === "all" || o.area === area) &&
+      (role === "all" || o.role === role) &&
+      (!opSearch ||
+        `${o.first_name} ${o.last_name} ${o.employee_id}`
+          .toLowerCase()
+          .includes(opSearch.toLowerCase())),
   );
-
-  const { pendingAdd, pendingRemove } = useMemo(() => {
-    let add = 0,
-      rem = 0;
-    selectedOps.forEach((o) =>
-      selectedComps.forEach((c) => {
-        if (matrix.has(`${o}::${c}`)) rem++;
-        else add++;
-      }),
-    );
-    return { pendingAdd: add, pendingRemove: rem };
-  }, [selectedOps, selectedComps, matrix]);
-
+  const mandatoryIds = new Set(
+    reqs.filter((r) => selectedRoles.includes(r.role) && r.mandatory).map((r) => r.competence_id),
+  );
+  const filteredComps = comps.filter(
+    (c) =>
+      (!mandatory || mandatoryIds.has(c.id)) &&
+      (!compSearch ||
+        `${c.competence_id} ${c.competence_name}`.toLowerCase().includes(compSearch.toLowerCase())),
+  );
   function toggle(set: Set<string>, setter: (s: Set<string>) => void, id: string) {
     const n = new Set(set);
     n.has(id) ? n.delete(id) : n.add(id);
     setter(n);
   }
-  function selectAll(items: { id: string }[], setter: (s: Set<string>) => void) {
-    setter(new Set(items.map((i) => i.id)));
-  }
-
-  async function applyChange(action: "added" | "removed") {
-    if (selectedOps.size === 0 || selectedComps.size === 0) {
-      toast.error("Select at least one operator and one competence");
-      return;
-    }
+  const statuses = useMemo(
+    () =>
+      filteredComps.map((c) => {
+        const rows = [...selectedOps].map((o) => matrix.get(`${o}::${c.id}`));
+        const assigned = rows.filter(Boolean).length;
+        const exact = rows.filter((r) => r?.actual_level === level).length;
+        const levels = [...new Set(rows.filter(Boolean).map((r) => r!.actual_level))];
+        return [c.id, { assigned, exact, levels }] as const;
+      }),
+    [filteredComps, selectedOps, matrix, level],
+  );
+  const statusMap = new Map(statuses);
+  const noChanges =
+    [...selectedOps].length > 0 &&
+    [...selectedComps].length > 0 &&
+    [...selectedOps].every((o) =>
+      [...selectedComps].every((c) => matrix.get(`${o}::${c}`)?.actual_level === level),
+    );
+  async function setLevels() {
+    if (!selectedOps.size || !selectedComps.size)
+      return toast.error("Select operators and competences");
     setBusy(true);
-    const changedBy = getChangedBy();
-    const opIds = [...selectedOps];
-    const compIds = [...selectedComps];
     try {
-      if (action === "added") {
-        const res = await m_bulkAssign(opIds, compIds, changedBy);
-        if (res.added === 0) toast.info(`Nothing to add · ${res.skipped} already assigned`);
-        else
-          toast.success(
-            `Added ${res.added} competence${res.added === 1 ? "" : "s"}` +
-              (res.skipped ? ` · ${res.skipped} skipped (duplicate)` : ""),
-          );
-      } else {
-        const res = await m_bulkUnassign(opIds, compIds, changedBy);
-        if (res.removed === 0) toast.info("None of the selected competences were assigned");
-        else toast.success(`Removed ${res.removed} competence${res.removed === 1 ? "" : "s"}`);
-      }
+      const r = await m_bulkSetLevel([...selectedOps], [...selectedComps], level, getChangedBy());
+      toast.success(`Created ${r.added}, updated ${r.updated}, no change ${r.skipped}`);
       qc.invalidateQueries();
     } finally {
       setBusy(false);
     }
   }
-
+  async function remove() {
+    if (!selectedOps.size || !selectedComps.size)
+      return toast.error("Select operators and competences");
+    setBusy(true);
+    try {
+      const r = await m_bulkUnassign([...selectedOps], [...selectedComps], getChangedBy());
+      toast.success(`Removed ${r.removed}, skipped ${r.skipped}`);
+      qc.invalidateQueries();
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <div className="p-8 space-y-6 h-screen flex flex-col">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Manage Competences</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Select operators and competences, then add or remove in bulk.
+          Bulk set competence levels 0–4. Existing assignments update; missing assignments are
+          created and logged.
         </p>
       </div>
-
       <div className="grid grid-cols-2 gap-6 flex-1 min-h-0">
         <Panel
           title="Operators"
           count={`${selectedOps.size} / ${filteredOps.length} selected`}
           search={opSearch}
           onSearch={setOpSearch}
-          onSelectAll={() => selectAll(filteredOps, setSelectedOps)}
+          onSelectAll={() => setSelectedOps(new Set(filteredOps.map((o) => o.id)))}
           onClear={() => setSelectedOps(new Set())}
-          extraFilters={
+          filters={
             <>
-              <Select value={shiftFilter} onValueChange={setShiftFilter}>
-                <SelectTrigger className="h-8 w-32 text-xs">
-                  <SelectValue placeholder="Shift" />
+              <Select value={shift} onValueChange={setShift}>
+                <SelectTrigger className="h-8 w-28">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All shifts</SelectItem>
@@ -168,15 +159,28 @@ function ManagePage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={areaFilter} onValueChange={setAreaFilter}>
-                <SelectTrigger className="h-8 w-40 text-xs">
-                  <SelectValue placeholder="Area" />
+              <Select value={area} onValueChange={setArea}>
+                <SelectTrigger className="h-8 w-36">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All areas</SelectItem>
                   {areas.map((a) => (
                     <SelectItem key={a} value={a}>
                       {a}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={role} onValueChange={setRole}>
+                <SelectTrigger className="h-8 w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All roles</SelectItem>
+                  {ROLES.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -190,124 +194,96 @@ function ManagePage() {
               checked={selectedOps.has(o.id)}
               onToggle={() => toggle(selectedOps, setSelectedOps, o.id)}
             >
-              <span className="font-mono text-xs text-muted-foreground w-12 shrink-0">
-                {o.employee_id}
-              </span>
+              <span className="font-mono text-xs w-12">{o.employee_id}</span>
               <span className="flex-1">
                 {o.last_name}, {o.first_name}
               </span>
+              <Badge variant="outline">{o.role}</Badge>
               <span className="text-xs text-muted-foreground">
                 {o.shift} · {o.area}
               </span>
             </Row>
           ))}
         </Panel>
-
         <Panel
           title="Competences"
           count={`${selectedComps.size} / ${filteredComps.length} selected`}
           search={compSearch}
           onSearch={setCompSearch}
-          onSelectAll={() => selectAll(filteredComps, setSelectedComps)}
+          onSelectAll={() => setSelectedComps(new Set(filteredComps.map((c) => c.id)))}
           onClear={() => setSelectedComps(new Set())}
+          filters={
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox checked={mandatory} onCheckedChange={(v) => setMandatory(!!v)} /> Mandatory
+              for selected roles
+            </label>
+          }
         >
-          {filteredComps.map((c) => (
-            <Row
-              key={c.id}
-              checked={selectedComps.has(c.id)}
-              onToggle={() => toggle(selectedComps, setSelectedComps, c.id)}
-            >
-              <span className="font-mono text-xs text-muted-foreground w-10 shrink-0">
-                {c.competence_id}
-              </span>
-              <span className="flex-1">{c.competence_name}</span>
-            </Row>
-          ))}
+          {filteredComps.map((c) => {
+            const st = statusMap.get(c.id);
+            return (
+              <Row
+                key={c.id}
+                checked={selectedComps.has(c.id)}
+                onToggle={() => toggle(selectedComps, setSelectedComps, c.id)}
+              >
+                <span className="font-mono text-xs w-10">{c.competence_id}</span>
+                <span className="flex-1">{c.competence_name}</span>
+                {selectedOps.size > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {st?.assigned ?? 0} of {selectedOps.size} assigned
+                    {(st?.levels.length ?? 0) > 1 ? " · Mixed levels" : ""}
+                    {st?.exact === selectedOps.size ? " · no change" : ""}
+                  </span>
+                )}
+              </Row>
+            );
+          })}
         </Panel>
       </div>
-
-      <div className="flex items-center justify-end gap-3 bg-card border border-border rounded-lg p-4">
+      <div className="bg-card border border-border rounded-lg p-4 flex items-center gap-3">
         <div className="flex-1 text-sm">
-          <span className="text-foreground font-medium">
-            {selectedOps.size} operator{selectedOps.size === 1 ? "" : "s"} × {selectedComps.size}{" "}
-            competence{selectedComps.size === 1 ? "" : "s"}
-          </span>
-          <span className="text-muted-foreground">
-            {" "}
-            = {selectedOps.size * selectedComps.size} assignment
-            {selectedOps.size * selectedComps.size === 1 ? "" : "s"}
-          </span>
-          {(pendingAdd > 0 || pendingRemove > 0) && (
-            <span className="ml-3 text-xs text-muted-foreground">
-              ({pendingAdd} new to add · {pendingRemove} existing to remove)
-            </span>
-          )}
+          <b>{selectedOps.size}</b> operators × <b>{selectedComps.size}</b> competences
         </div>
+        <Select value={String(level)} onValueChange={(v) => setLevel(Number(v) as Level)}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {LEVELS.map((l) => (
+              <SelectItem key={l} value={String(l)}>
+                Set level {l}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           variant="outline"
-          disabled={busy || selectedOps.size === 0 || selectedComps.size === 0}
-          onClick={() => setConfirm("removed")}
+          disabled={busy || !selectedOps.size || !selectedComps.size}
+          onClick={remove}
           className="gap-2"
         >
-          <Minus className="h-4 w-4" /> Remove
+          <Minus className="h-4 w-4" />
+          Remove competence
         </Button>
         <Button
-          disabled={busy || selectedOps.size === 0 || selectedComps.size === 0}
-          onClick={() => setConfirm("added")}
+          disabled={busy || !selectedOps.size || !selectedComps.size || noChanges}
+          onClick={setLevels}
           className="gap-2"
         >
-          <Plus className="h-4 w-4" /> Add
+          <Save className="h-4 w-4" />
+          Set level
         </Button>
+        {noChanges && <span className="text-xs text-muted-foreground">No changes needed</span>}
       </div>
-
-      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirm === "added"
-                ? "Add competence assignments?"
-                : "Remove competence assignments?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirm === "added"
-                ? `${pendingAdd} competence assignment${pendingAdd === 1 ? " will be" : "s will be"} created. ${
-                    selectedOps.size * selectedComps.size - pendingAdd
-                  } already exist and will be skipped.`
-                : `${pendingRemove} competence assignment${pendingRemove === 1 ? " will be" : "s will be"} removed.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                const a = confirm!;
-                setConfirm(null);
-                applyChange(a);
-              }}
-            >
-              Confirm
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
-
-function Panel({
-  title,
-  count,
-  search,
-  onSearch,
-  onSelectAll,
-  onClear,
-  extraFilters,
-  children,
-}: any) {
+function Panel({ title, count, search, onSearch, onSelectAll, onClear, filters, children }: any) {
   return (
     <div className="bg-card border border-border rounded-lg flex flex-col min-h-0">
       <div className="p-4 border-b border-border space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex justify-between">
           <h2 className="font-semibold">{title}</h2>
           <span className="text-xs text-muted-foreground">{count}</span>
         </div>
@@ -315,14 +291,14 @@ function Panel({
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           placeholder="Search…"
-          className="h-8 text-sm"
+          className="h-8"
         />
-        {extraFilters && <div className="flex gap-2">{extraFilters}</div>}
+        <div className="flex flex-wrap gap-2">{filters}</div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={onSelectAll} className="h-7 text-xs">
+          <Button size="sm" variant="outline" onClick={onSelectAll}>
             Select all visible
           </Button>
-          <Button size="sm" variant="ghost" onClick={onClear} className="h-7 text-xs">
+          <Button size="sm" variant="ghost" onClick={onClear}>
             Clear
           </Button>
         </div>
@@ -331,7 +307,6 @@ function Panel({
     </div>
   );
 }
-
 function Row({ checked, onToggle, children }: any) {
   return (
     <label className="flex items-center gap-3 px-4 py-2 border-b border-border/60 hover:bg-secondary/60 cursor-pointer text-sm">
