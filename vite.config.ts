@@ -19,4 +19,14 @@ export default defineConfig({
     },
     dedupe: ["react", "react-dom", "@tanstack/react-router"],
   },
+  server: {
+    host: "0.0.0.0",
+    port: 8080,
+  },
+  resolve: {
+    alias: {
+      "@": "/src",
+    },
+    dedupe: ["react", "react-dom", "@tanstack/react-router"],
+  },
 });

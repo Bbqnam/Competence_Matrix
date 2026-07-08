@@ -282,21 +282,47 @@ function seed(): Store {
   training_log.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   return { operators, competences, operator_competences, role_requirements, training_log };
 }
+function isValidStore(value: unknown): value is Store {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<Store>;
+  return (
+    Array.isArray(candidate.operators) &&
+    Array.isArray(candidate.competences) &&
+    Array.isArray(candidate.operator_competences) &&
+    Array.isArray(candidate.role_requirements) &&
+    Array.isArray(candidate.training_log)
+  );
+}
+
+function saveSeededStore(storeToSave: Store) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(storeToSave));
+  } catch (error) {
+    console.warn("Unable to persist demo store", error);
+  }
+}
 function load(): Store {
   if (typeof window === "undefined") return seed();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  const s = seed();
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-  } catch {}
-  return s;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (isValidStore(parsed)) return parsed;
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  } catch (error) {
+    console.warn("Resetting invalid demo store", error);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+  }
+  const seeded = seed();
+  saveSeededStore(seeded);
+  return seeded;
 }
 let store = load();
 function persist() {
-  if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  if (typeof window !== "undefined") saveSeededStore(store);
   notify();
 }
 export function resetDemo() {
