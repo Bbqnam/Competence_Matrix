@@ -26,7 +26,7 @@ function AppLayout() {
 
   function updateUser(v: string) {
     setUser(v);
-    localStorage.setItem(CHANGED_BY_KEY, v || "shiftleader");
+    localStorage.setItem(CHANGED_BY_KEY, v || DEFAULT_CHANGED_BY);
   }
 
   return (
